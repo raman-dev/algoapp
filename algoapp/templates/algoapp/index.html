@@ -4,18 +4,12 @@
 {% block content %}
 <script>
     $(document).ready(() => {
-        /*var svg = d3.select("svg");
-        var radius = 20;
-        var points = getRandomPointSet(720,480,radius,5);
-        drawLines(points,radius);
-        drawNodes(points,radius);  */  
-        //
-        /*$("#newNodeSet").on('click',(e) => {
-            console.log("add circle!");
-            var n = Math.max(Math.floor(Math.random() * 10),5);
-            var verts = getRandomPointSet(720,480,radius,n);
-            drawLines(verts,radius);
-            drawNodes(verts,radius); */
+        $("#runFullAlgo").on("click",() => {
+            //need to access and store data of the current points
+            var data = d3.select("svg").selectAll("circle").data();
+            console.log(data);
+            quickhull(data,0,data.length - 1);
+        });
     });
     //draw a rectangle
     //var height = 720;
@@ -42,10 +36,16 @@
         <circle stroke="black" cx="0" cy="0" r="0"></circle>
     </svg>
 </div>
-<div class="row">
-    <button id="newNodeSet" class="btn bg-dark btn-secondary" type="button" >
-        New Set!
-    </button>
+<div class="row justify-content-center">
+    <div class="btn-group" role="group">
+        <button id="newNodeSet" class="btn bg-dark btn-secondary" type="button" >
+            New Set!
+        </button>
+        <button id="runFullAlgo" class="btn bg-dark btn-secondary" type="button">
+            Run
+        </button>
+    </div>
+    
 </div>
 {% endblock %}
      

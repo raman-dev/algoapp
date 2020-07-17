@@ -17,6 +17,11 @@
             this.x = x;
             this.y = y;
         }
+
+        Point.prototype.toString = function() {
+            return "n"+this.x.toString()+""+this.y.toString();
+        };
+
         function shuffle(a) {
             var j, x, i;
             for (i = a.length - 1; i > 0; i--) {
@@ -80,6 +85,12 @@
         }
 
         function drawNodes(points,radius,fill_color){
+            points.sort((a,b)=>{
+                //less than 0 means b is larger
+                //0 means equal
+                //greater than 0 means a is the larger
+                return  a.x - b.x;
+            });
             var svg = d3.select("svg");//svg to draw nodes on
             var nodes = svg.selectAll("circle");
             //set position and radius
@@ -92,7 +103,8 @@
             .attr("r",(d,i) => {return radius})
             .style("fill",fill_color)
             .attr("stroke","black")
-            .attr("stroke-width","0.5%")
+            .attr("stroke-width","0.25%")
+            .attr("id",(d,i) => {return d.toString();} )
             .attr("cx", (p) => { return p.x*(2 * radius)})
             .attr("cy", (p) => { return p.y*(2 * radius)});
             //nodes.style("fill","black").transition()
@@ -109,7 +121,8 @@
                 .attr("r",radius)
                 .style("fill",fill_color)
                 .attr("stroke","black")
-                .attr("stroke-width","0.5%")
+                .attr("stroke-width","0.25%")
+                .attr("id",(d,i) => {return d.toString();} )
                 .attr("cx", (p) => { return p.x*(2 * radius)})
                 .attr("cy", (p) => { return p.y*(2 * radius)});
             }else if(num_nodes > points.length){
@@ -121,7 +134,94 @@
                 .remove();
             }
             //enough nodes just pass in new data and radius
-            
+        }
+        const hull_hlight = "blue";
+        const uhull_hlight = "red";
+        const lhull_hlight = "green";
+        const neutral_hlight= "black";
+
+        function quickhull(points){
+            //given all these points
+            //perform quick hull
+            //first sort points by x coordinate
+            points.sort((a,b)=>{
+                //less than 0 means b is larger
+                //0 means equal
+                //greater than 0 means a is the larger
+                return  a.x - b.x;
+            });
+            console.log(points);
+            //now find the two most extreme points from the set
+            pmin = points[0];
+            pmax = points[points.length - 1];
+            highlightNode(pmin,neutral_hlight,hull_hlight);
+            highlightNode(pmax,neutral_hlight,hull_hlight);
+            //now we need to highlight each point
+            console.log(pmin);
+            console.log(pmax);
+            //seperate into upperhull and lowerhull
+            //
+            var upperhull = [];
+            var lowerhull = [];
+            //for every point inbetween min index and max index\
+            //don't include end points in the new intervals
+            var pmu = null;
+            var pml = null;
+
+            var upper_max_area = 0;
+            var lower_max_area = 0;
+
+            points.forEach( p => {
+                if(p != pmin && p != pmax){
+                    var d = determinant(pmax,p,pmin);
+                    if(d < 0){
+                        upperhull.push(p);
+                        //calculate the area of the trianlge constructed by
+                        //conveniently half the determinant is also the area of the triangle constructed by those 3 poiints 
+                        if(-d / 2 > upper_max_area){
+                            upper_max_area = -d/2;
+                            pmu = p;
+                        }
+                    }else{
+                        lowerhull.push(p);
+                        if(d/2 > lower_max_area){
+                            lower_max_area = d/2;
+                            pml = p;
+                        }
+                    }
+                }
+            });
+
+            console.log(upperhull);
+            console.log(lowerhull);
+            //if the upperhull is non empty
+            console.log(pmu);
+            console.log(pml);
+            highlightNode(pmu,neutral_hlight,uhull_hlight);//so redraw a node there? or alter that node
+            highlightNode(pml,neutral_hlight,lhull_hlight);
+            //find pmax upper
+            //this point will maximize the area of triangle pminpmupmax
+            //finding this will encompass points within the triangle
+            //and using the determinant we can then find points we need to quick hul
+            //that are to the left of pminpmu and right of pmupmax
+            //the triangle that
+            //how to find pmax upper
+            //now if pmu == null means upper hull is empty
+            //if pml == null means lower hull is empty
+
+        }
+
+        function determinant(p1,p2,p3){
+            return p1.x*p2.y + p2.x*p3.y + p3.x*p1.y -p1.y*p2.x - p2.y*p3.x - p3.y*p1.x;
+        }
+
+        function highlightNode(point,stroke_color,fill_color){
+            //highlight this particular node in the svg
+            //maybe i can keep an index map of which point corresponds to what index
+            d3.select("svg")
+            .select("#"+point.toString()).transition().duration(700)
+            .attr("stroke",stroke_color)
+            .style("fill",fill_color);
         }
 
         function updateLabels(algo_id){
@@ -140,11 +240,6 @@
             }
         }
         $(document).ready(function() { 
-            $(".dropdown-menu").mouseleave(function(){
-                //console.log("mouseleave!");
-                $(".dropdown-menu").removeClass("show");
-            });
-
             $(".dropdown-item").on('click',function(e){
                 id = $(this).attr('id');
                 console.log(id);
@@ -159,13 +254,13 @@
                 updateLabels(id);
                 readyDrawSVG(id);
             });
-            readyDrawSVG("dijkstras");
+            readyDrawSVG("quickhull");
         });
         const MIN_D_NODES = 5;//nodes
         const MIN_Q_NODES = 20;//points
         
         const D_NODE_RADIUS = 20;
-        const Q_NODE_RADIUS = 3;
+        const Q_NODE_RADIUS = 5;
         
         const width = 720;
         const height = 480;
@@ -184,7 +279,7 @@
                     //call drawNodes with min default nodes
                     drawNodes(getRandomPointSet(width,height,Q_NODE_RADIUS,MIN_Q_NODES)
                     ,Q_NODE_RADIUS,//radius
-                    "black");//fill color
+                    "white");//fill color
                     break;
             }
         }
