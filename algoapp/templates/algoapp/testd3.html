@@ -1,0 +1,33 @@
+{% extends "algoapp/base.html" %}
+
+{% block content %}
+<script>
+    $(document).ready(() => {
+        var svg = d3.select("svg");
+        var radius = 20;
+        var points = getRandomPointSet(720,480,radius,5);
+        drawLines(points,radius);
+        drawNodes(points,radius);    
+        //
+        $("#newNodeSet").on('click',(e) => {
+            console.log("add circle!");
+            var verts = getRandomPointSet(720,480,radius,Math.floor(Math.random() * 7 + 1));
+            drawLines(verts,radius);
+            drawNodes(verts,radius); 
+        });
+    });
+    
+</script>
+<div class="row">
+    <svg width = "720" height="480">
+        <path fill="none" stroke="black"></path>
+        <circle stroke="black" cx="0" cy="0" r="0"></circle>
+    </svg>
+</div>
+<div class="row">
+    <button id="newNodeSet" class="btn bg-dark btn-secondary" type="button" >
+        New Set!
+    </button>
+</div>
+
+{% endblock %}

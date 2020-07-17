@@ -1,102 +1,51 @@
-<!DOCTYPE html class="h-100">
-  <head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Language" content="en">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
 
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
-    
-    <script type="text/javascript">
-        $(document).ready(function() {
-            $(".dropdown-item").on('click',function(e){
-                id = $(this).attr('id');
-                console.log(id);
-                $(".active").removeClass("active");
-                //$(this).find("a.dropdown-item").addClass("active");
-                //rotate a carousel?
-                //or what
-                //clear canvas
-                
-            
-            });
-        });
-    </script>
-    <title>Hello, world!</title>
-  </head>
-  <body>
-      <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <a class="navbar-brand">
-                AlgoApp
-            </a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav mr-auto" >
-                    <li class="nav-item">
-                        <div class ="dropdown">
-                            <button class="btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                Algorithms
-                            </button>
-                            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                                <a href="#" id="#dijkstras" class="dropdown-item active" >DIJKSTRAS</a>          
-                                <a href="#" id="#quickhull" class="dropdown-item" >QUICKHULL</a>
-                                <a href="#" id="#johnson_trotter" class="dropdown-item">JOHNSON TROTTER</a>
-                            </div>
-                        </div>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#">Data Structures</a> 
-                    </li>
-                </ul>
-            </div>
-        </nav>
+{% extends "algoapp/base.html" %}
 
-    <div class="container-fluid h-100">
-        <div class="row">
-            <div class="col-4">
-                <!--
-                    describe algorithm
-                -->
-            </div>
-            <div class="col-8" style="background-color: lavender ;">
-                <canvas id="RenderCanvas" height="480" width="720" >
-                    <!--script>
-                        var canvas = document.getElementById("RenderCanvas");
-                        var ctx = canvas.getContext("2d");
-                        //draw a rectangle
-                        ctx.fillStyle = "#FF0000";
-                        ctx.fillRect(0,0,150,75);
-                        //draw a line
-                        ctx.moveTo(0,0);
-                        ctx.lineTo(200,100);
-                        ctx.stroke();
-                        //draw a circle
-                        ctx.beginPath();
-                        ctx.arc(95,50,40,0,2*Math.PI);
-                        ctx.stroke();
-                        //plan is 
-                        //need to draw points
-                        //draw a random set of points 
-                        
-                        //perform quickhull algorithm
-                        
-                        //features
-                        //one click run through
-                        //step by step runthrough
-                        //restart to beginning
-                        //refresh new set of points
-                    </script-->
-                </canvas>
-            </div>
-            
-            
-        </div>
-    </div>
+{% block content %}
+<script>
+    $(document).ready(() => {
+        /*var svg = d3.select("svg");
+        var radius = 20;
+        var points = getRandomPointSet(720,480,radius,5);
+        drawLines(points,radius);
+        drawNodes(points,radius);  */  
+        //
+        /*$("#newNodeSet").on('click',(e) => {
+            console.log("add circle!");
+            var n = Math.max(Math.floor(Math.random() * 10),5);
+            var verts = getRandomPointSet(720,480,radius,n);
+            drawLines(verts,radius);
+            drawNodes(verts,radius); */
+    });
+    //draw a rectangle
+    //var height = 720;
+    //var width = 720;
+    //radius = 20;//
+    //n = 8
+    //points = getRandomPointSet(width,height,radius,n);//points have radius*2 width
+    //draw a random set of points on the canvas
+    //need to draw points
+    //draw a random set of points 
     
-  </body>
-</html>
+    //perform quickhull algorithm
+    
+    //features
+    //one click run through
+    //step by step runthrough
+    //restart to beginning
+    //refresh new set of points
+    
+</script>
+<div class="row">
+    <svg width = "720" height="480">
+        <path fill="none" stroke="black"></path>
+        <circle stroke="black" cx="0" cy="0" r="0"></circle>
+    </svg>
+</div>
+<div class="row">
+    <button id="newNodeSet" class="btn bg-dark btn-secondary" type="button" >
+        New Set!
+    </button>
+</div>
+{% endblock %}
+     
