@@ -1,26 +1,119 @@
-<!DOCTYPE html class="h-100">
-  <head>
+<!doctype html>
+<html lang="en">
+
+<head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
-    <meta http-equiv="Content-Language" content="en">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
-    
-    <script src="https://d3js.org/d3.v5.js"></script>
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
-    
-    <script type="text/javascript">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
-        function Point(x,y){
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.8.2/css/all.css">
+    <!-- Google Fonts -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap">
+    <!-- Bootstrap core CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Material Design Bootstrap -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.19.1/css/mdb.min.css" rel="stylesheet">
+
+    <!-- JQuery -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <!-- Bootstrap tooltips -->
+    <script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.4/umd/popper.min.js"></script>
+    <!-- Bootstrap core JavaScript -->
+    <script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/js/bootstrap.min.js"></script>
+    <!-- MDB core JavaScript -->
+    <script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.19.1/js/mdb.min.js"></script>
+    <script src="https://d3js.org/d3.v5.js"></script>
+    <script src="https://unpkg.com/d3-interpolate-path/build/d3-interpolate-path.min.js"></script>
+
+
+    <script type="text/javascript">
+        const MIN_D_NODES = 5;//nodes
+        const MIN_Q_NODES = 20;//points
+        const DEFAULT_PERM = "abc";//default text for permutation
+
+        const D_NODE_RADIUS = 20;
+        const Q_NODE_RADIUS = 5;
+
+        const width = 720;
+        const height = 480;
+
+        const blue = "blue";
+        const red = "red";
+        const green = "green";
+        const cyan = "#0bb";
+
+        var isAnimating = false;
+
+
+        var scale = 2 * Q_NODE_RADIUS;
+        var dijkstra_points = null;
+        var hull_points = null;
+
+
+        function Point(x, y) {
             this.x = x;
             this.y = y;
         }
 
-        Point.prototype.toString = function() {
-            return "n"+this.x.toString()+""+this.y.toString();
+        Point.prototype.toString = function () {
+            return "n" + this.x.toString() + "" + this.y.toString();
         };
+
+        class AnimationNode {
+            id = null;
+            points = null;
+            constructor(id, points) {
+                this.points = points;
+                this.id = id;
+                if (points.length == 3) {
+                    this.local_d1 = [[points[0].x * scale, points[0].y * scale], [points[2].x * scale, points[2].y * scale]];
+                    this.local_d2 = Array.from(this.local_d1);
+                    this.local_d2.splice(1, 0, [points[1].x * scale, points[1].y * scale]);
+                }
+            }
+
+            renderLines(next_index, animNodes) {
+                //now what?
+                //now if points is size 2 do a transition from a to b
+                //if size is 3 then do a transition from points[0],points[2] to points[0],points[1],points[2]
+                isAnimating = true;
+                if (this.points.length == 2) {
+                    var pmin = this.points[0];
+                    var pmax = this.points[1];
+                    highlightNode(pmin, cyan, blue).on('end', () => {
+                        highlightNode(pmax, cyan, blue).on('end', () => {
+                            drawNewLine([[pmin.x * scale, pmin.y * scale]], this.id, scale, cyan);
+                            transitionLine(this.id, [[pmin.x * scale, pmin.y * scale]], [[pmin.x * scale, pmin.y * scale], [pmax.x * scale, pmax.y * scale]]).on('end', () => {
+                                if (next_index < animNodes.length) {
+                                    animNodes[next_index].renderLines(next_index + 1, animNodes);
+                                } else {
+                                    isAnimating = false;
+                                }
+                            });
+                        });
+                    });
+
+
+                } else {
+                    //we want to highlight the middle point
+                    highlightNode(this.points[1], cyan, blue).on('end', () => {
+                        drawNewLine(this.local_d1, this.id, scale, cyan);
+                        transitionLine(this.id, this.local_d1, this.local_d2).on('end', () => {
+                            if (next_index < animNodes.length) {
+                                animNodes[next_index].renderLines(next_index + 1, animNodes);
+                            } else {
+                                isAnimating = false;
+                            }
+                        });
+                    });
+
+                }
+            }
+        }
 
         function shuffle(a) {
             var j, x, i;
@@ -32,64 +125,64 @@
             }
             return a;
         }
-        
-            //return n random points in the plane of width x height
-        function getRandomPointSet(width,height,radius,n){
-                //return a point set of within width x height
-                //where each point has radius,'radius', 
-                //points must be non overlapping 
-                //divide the plane into radius x radius squares
-                //width / radius => num squares in width
-                //height / radius => num squares in height
-                //randomly select indices from 0 to 
-                var h = height - radius;
-                var w = width - radius;
-                var rows = Math.floor(h / (radius*2));
-                var cols = Math.floor(w / (radius*2));
-                //randomly select rows and cols
-                //select n pairs from rows and cols
-                
-                console.log(rows);
-                console.log(cols);
-                var r_index = [];
-                var c_index = [];
-                for(i = 1; i < rows - 1;i++){
-                    r_index.push(i);
-                }
-                for(i = 1;i < cols - 1;i++){
-                    c_index.push(i);
-                }
-                //n rows and n cols
-                shuffle(r_index);
-                shuffle(c_index);
-                //console.log(r_index);
-                //console.log(c_index);
-                //
-                let points = [];
-                for(i = 0 ;i < n;i++){
-                    points.push(new Point(c_index[i],r_index[i]));
-                }
-                return points;
+
+        //return n random points in the plane of width x height
+        function getRandomPointSet(width, height, radius, n) {
+            //return a point set of within width x height
+            //where each point has radius,'radius', 
+            //points must be non overlapping 
+            //divide the plane into radius x radius squares
+            //width / radius => num squares in width
+            //height / radius => num squares in height
+            //randomly select indices from 0 to 
+            var h = height - radius;
+            var w = width - radius;
+            var rows = Math.floor(h / (radius * 2));
+            var cols = Math.floor(w / (radius * 2));
+            //randomly select rows and cols
+            //select n pairs from rows and cols
+
+            console.log(rows);
+            console.log(cols);
+            var r_index = [];
+            var c_index = [];
+            for (i = 1; i < rows - 1; i++) {
+                r_index.push(i);
             }
-            
-        function drawLines(points,scale){
+            for (i = 1; i < cols - 1; i++) {
+                c_index.push(i);
+            }
+            //n rows and n cols
+            shuffle(r_index);
+            shuffle(c_index);
+            //console.log(r_index);
+            //console.log(c_index);
+            //
+            let points = [];
+            for (i = 0; i < n; i++) {
+                points.push(new Point(c_index[i], r_index[i]));
+            }
+            return points;
+        }
+
+        function drawLines(points, scale) {
             var svg = d3.select("svg");
             let parray = [];
-            for (i = 0;i < points.length;i++){
-                let a = [points[i].x*(2*scale),points[i].y*(2 * scale)];
+            for (i = 0; i < points.length; i++) {
+                let a = [points[i].x * (2 * scale), points[i].y * (2 * scale)];
                 parray.push(a);
             }
             var lines = svg.selectAll("path");
             lgen = d3.line();
-            lines.attr("d",lgen(parray));
+            lines.attr("d", lgen(parray));
         }
 
-        function drawNodes(points,radius,fill_color){
-            points.sort((a,b)=>{
+        function drawNodes(points, radius, node_scale, fill_color, label_flag) {
+            points.sort((a, b) => {
                 //less than 0 means b is larger
                 //0 means equal
                 //greater than 0 means a is the larger
-                return  a.x - b.x;
+                return a.x - b.x;
             });
             var svg = d3.select("svg");//svg to draw nodes on
             var nodes = svg.selectAll("circle");
@@ -99,133 +192,240 @@
             //work on all nodes available
             nodes = nodes.data(points);
             nodes.transition()
-            .duration(anim_duration)
-            .attr("r",(d,i) => {return radius})
-            .style("fill",fill_color)
-            .attr("stroke","black")
-            .attr("stroke-width","0.25%")
-            .attr("id",(d,i) => {return d.toString();} )
-            .attr("cx", (p) => { return p.x*(2 * radius)})
-            .attr("cy", (p) => { return p.y*(2 * radius)});
+                .duration(anim_duration)
+                .attr("r", (d, i) => { return radius })
+                .style("fill", fill_color)
+                .attr("stroke", "black")
+                .attr("stroke-width", "0.25%")
+                .attr("id", (d, i) => { return d.toString(); })
+                .attr("cx", (p) => { return p.x * (node_scale) })
+                .attr("cy", (p) => { return p.y * (node_scale) });
             //nodes.style("fill","black").transition()
 
             //not enough nodes already on the screen
-            if (num_nodes < points.length){
+            if (num_nodes < points.length) {
                 //we need to add nodes
                 //this count doesn't matter since 1 call will sync it if we provide data
                 //nodes_add = points.length - nodes.size();
                 ////enter represents the selection of new circles
                 //nodes = svg.selectAll("circle");
                 nodes = nodes.enter().append('circle');
+                nodes.attr("cx", width / 2);
+                nodes.attr("cy", height / 2);
                 nodes.transition().duration(anim_duration)
-                .attr("r",radius)
-                .style("fill",fill_color)
-                .attr("stroke","black")
-                .attr("stroke-width","0.25%")
-                .attr("id",(d,i) => {return d.toString();} )
-                .attr("cx", (p) => { return p.x*(2 * radius)})
-                .attr("cy", (p) => { return p.y*(2 * radius)});
-            }else if(num_nodes > points.length){
+                    .attr("r", radius)
+                    .style("fill", fill_color)
+                    .attr("stroke", "black")
+                    .attr("stroke-width", "0.25%")
+                    .attr("id", (d, i) => { return d.toString(); })
+                    .attr("cx", (p) => { return p.x * node_scale })
+                    .attr("cy", (p) => { return p.y * node_scale });
+            } else if (num_nodes > points.length) {
                 //remove this many nodes
                 //nodes_remove = nodes.size() - points.length;
                 nodes.exit().transition()
-                .duration(anim_duration)
-                .attr('r',0)
-                .remove();
+                    .duration(anim_duration)
+                    .attr('r', 0)
+                    .remove();
             }
-            //enough nodes just pass in new data and radius
-        }
-        const hull_hlight = "blue";
-        const uhull_hlight = "red";
-        const lhull_hlight = "green";
-        const neutral_hlight= "black";
+            //enough nodes just pass in new data and radius`
+            if (label_flag == true) {
+                var text = svg.selectAll("text")
+                    .data(points)
+                    .enter()
+                    .append("text");
 
-        function quickhull(points){
-            //given all these points
-            //perform quick hull
-            //first sort points by x coordinate
-            points.sort((a,b)=>{
-                //less than 0 means b is larger
-                //0 means equal
-                //greater than 0 means a is the larger
-                return  a.x - b.x;
+                text.attr("x", (d) => { return d.x * scale; })
+                    .attr("y", (d) => { return d.y * scale; })
+                    .attr("id", (d) => { return d.toString(); })
+                    .text((d) => { return "(" + d.x + "," + d.y + ")"; })
+                    .attr("font-family", "sans-serif")
+                    .attr("font-size", "12px")
+                    .attr("fill", "black");
+            }
+        }
+
+        function drawLine(data_old, data_new, scale, stroke_color) {
+            var svg = d3.select("svg");
+            var line = d3.line();
+            var c_in = [];
+            svg.select("path").attr("stroke", stroke_color);
+            if (data_old.length > 0) {
+                data_old.forEach(p => {
+                    c_in.push([p.x * scale, p.y * scale]);
+                });
+            }
+
+            var c_out = [];
+            data_new.forEach(p => {
+                c_out.push([p.x * scale, p.y * scale]);
             });
-            console.log(points);
-            //now find the two most extreme points from the set
-            pmin = points[0];
-            pmax = points[points.length - 1];
-            highlightNode(pmin,neutral_hlight,hull_hlight);
-            highlightNode(pmax,neutral_hlight,hull_hlight);
-            //now we need to highlight each point
-            console.log(pmin);
-            console.log(pmax);
-            //seperate into upperhull and lowerhull
-            //
+            svg.select("path")
+                .attr('d', line(c_in))
+                .transition().delay(500)
+                .attr('d', line(c_out));
+        }
+
+
+        function convex_hull(data) {
+            data.sort((a, b) => {
+                return a.x - b.x;
+            });
+            var result = [];
+            var animNodes = [];
+            quickhull(data, result, animNodes);
+            //highlight nodes as they are selected
+            //so first highlight blue pmin and pmax
+            //result.forEach( p => { highlightNode(p,cyan,blue);});
+            animNodes[0].renderLines(1, animNodes);
+        }
+
+        function determinant(p1, p2, p3) {
+            return p1.x * p2.y + p2.x * p3.y + p3.x * p1.y - (p1.y * p2.x) - (p2.y * p3.x) - (p1.x * p3.y);
+        }
+
+        function quickhull(points, result, animNodes) {
+            var pmin = points[0];
+            var pmax = points[points.length - 1];
+
+            if (result.length == 0) {
+                result.push(pmin);
+                result.push(pmax);
+                minmax_id = pmin.toString() + pmax.toString();
+                animNodes.push(new AnimationNode(minmax_id, [pmin, pmax]));
+            }
             var upperhull = [];
             var lowerhull = [];
-            //for every point inbetween min index and max index\
-            //don't include end points in the new intervals
-            var pmu = null;
-            var pml = null;
+
+            var pmax_upper;
+            var pmax_lower;
 
             var upper_max_area = 0;
             var lower_max_area = 0;
 
-            points.forEach( p => {
-                if(p != pmin && p != pmax){
-                    var d = determinant(pmax,p,pmin);
-                    if(d < 0){
+            points.forEach(p => {
+                if (p != pmin && p != pmax) {
+                    var d = determinant(pmin, pmax, p);
+                    if (d > 0) {
                         upperhull.push(p);
-                        //calculate the area of the trianlge constructed by
-                        //conveniently half the determinant is also the area of the triangle constructed by those 3 poiints 
-                        if(-d / 2 > upper_max_area){
-                            upper_max_area = -d/2;
-                            pmu = p;
+                        if (d / 2 > upper_max_area) {
+                            upper_max_area = d / 2;
+                            pmax_upper = p;
                         }
-                    }else{
+                    } else {
                         lowerhull.push(p);
-                        if(d/2 > lower_max_area){
-                            lower_max_area = d/2;
-                            pml = p;
+                        if (d / 2 < lower_max_area) {
+                            lower_max_area = d / 2;
+                            pmax_lower = p;
                         }
                     }
                 }
             });
 
-            console.log(upperhull);
-            console.log(lowerhull);
-            //if the upperhull is non empty
-            console.log(pmu);
-            console.log(pml);
-            highlightNode(pmu,neutral_hlight,uhull_hlight);//so redraw a node there? or alter that node
-            highlightNode(pml,neutral_hlight,lhull_hlight);
-            //find pmax upper
-            //this point will maximize the area of triangle pminpmupmax
-            //finding this will encompass points within the triangle
-            //and using the determinant we can then find points we need to quick hul
-            //that are to the left of pminpmu and right of pmupmax
-            //the triangle that
-            //how to find pmax upper
-            //now if pmu == null means upper hull is empty
-            //if pml == null means lower hull is empty
+            if (lowerhull.length > 0) {
+                result.push(pmax_lower);
+                var id = pmin.toString() + pmax_lower.toString() + pmax.toString();
+                animNodes.push(new AnimationNode(id, [pmin, pmax_lower, pmax]));
 
+                //points to the left of the pmin pmaxupper line
+                var left_lower_hull = [pmin];
+                //points to the left of the pmaxupper-pmax line
+                var right_lower_hull = [pmax_lower];
+                lowerhull.forEach(p => {
+                    //left_upper potential
+                    if (p != pmax_lower) {
+                        if (p.x < pmax_lower.x) {
+                            var d = determinant(pmin, pmax_lower, p);
+                            if (d < 0) {
+                                left_lower_hull.push(p);
+                            }
+                        } else {
+                            var d = determinant(pmax_lower, pmax, p);
+                            if (d < 0) {
+                                right_lower_hull.push(p);
+                            }
+                        }
+                    }
+
+                });
+                left_lower_hull.push(pmax_lower);
+                right_lower_hull.push(pmax);
+                if (left_lower_hull.length > 2) {
+                    quickhull(left_lower_hull, result, animNodes);
+                }
+                if (right_lower_hull.length > 2) {
+                    quickhull(right_lower_hull, result, animNodes);
+                }
+            }
+            if (upperhull.length > 0) {
+                result.push(pmax_upper);
+                var id = pmin.toString() + pmax_upper.toString() + pmax.toString();
+                animNodes.push(new AnimationNode(id, [pmin, pmax_upper, pmax]));
+                //points to the left of the pmin pmaxupper line
+                var left_upper_hull = [pmin];
+                //points to the left of the pmaxupper-pmax line
+                var right_upper_hull = [pmax_upper];
+                upperhull.forEach(p => {
+                    //left_upper potential
+                    if (p != pmax_upper) {
+                        if (p.x < pmax_upper.x) {
+                            var d = determinant(pmin, pmax_upper, p);
+                            if (d > 0) {
+                                left_upper_hull.push(p);
+                            }
+                        } else {
+                            var d = determinant(pmax_upper, pmax, p);
+                            if (d > 0) {
+                                right_upper_hull.push(p);
+                            }
+                        }
+                    }
+
+                });
+                left_upper_hull.push(pmax_upper);
+                right_upper_hull.push(pmax);
+                if (left_upper_hull.length > 2) {
+                    quickhull(left_upper_hull, result, animNodes);
+                }
+                if (right_upper_hull.length > 2) {
+                    quickhull(right_upper_hull, result, animNodes);
+                }
+            }
         }
 
-        function determinant(p1,p2,p3){
-            return p1.x*p2.y + p2.x*p3.y + p3.x*p1.y -p1.y*p2.x - p2.y*p3.x - p3.y*p1.x;
+        function transitionLine(id, d1, d2) {
+            var line = d3.line();
+            var t = d3.select("#" + id).attr('d', line(d1)).transition();
+            return t.duration(500).attrTween('d', function () { return d3.interpolatePath(line(d1), line(d2)); });
         }
 
-        function highlightNode(point,stroke_color,fill_color){
+        function drawNewLine(points, id, scale, stroke_color) {
+            var svg = d3.select("svg");
+            var path = svg.append("path");
+            var data = points;
+            //points.forEach( p=> {data.push([p.x*scale,p.y*scale]);});
+            var line = d3.line(data);
+            path.attr('d', line(data));
+            path.attr('fill', "none");
+            path.attr('id', id);
+            path.attr('stroke', stroke_color);
+            return path;
+        }
+
+        function highlightNode(point, stroke_color, fill_color) {
             //highlight this particular node in the svg
             //maybe i can keep an index map of which point corresponds to what index
-            d3.select("svg")
-            .select("#"+point.toString()).transition().duration(700)
-            .attr("stroke",stroke_color)
-            .style("fill",fill_color);
+            if (point == null) {
+                return;
+            }
+            return d3.select("svg")
+                .select("#" + point.toString()).transition().duration(300)
+                .attr("stroke", stroke_color)
+                .style("fill", fill_color);
         }
 
-        function updateLabels(algo_id){
-            switch (id){
+        function updateLabels(algo_id) {
+            switch (id) {
                 case "dijkstras":
                     $(".carousel").carousel(0);
 
@@ -239,135 +439,239 @@
                     break;
             }
         }
-        $(document).ready(function() { 
-            $(".dropdown-item").on('click',function(e){
+        $(document).ready(function () {
+            $(".nav-item").on('click', function (e) {
                 id = $(this).attr('id');
                 console.log(id);
-                $("a.active").removeClass("active");
-                $("#"+id).addClass("active");
-                $(".dropdown-menu").removeClass("show");
+                //$("a.active").removeClass("active");
+                previous_id = $('li.active').attr('id');
+                $("li.active").removeClass("active");
+                $("#" + id).addClass("active");
 
                 //rotate a carousel?
                 //or what
                 //clear canvas
                 //change the title
                 updateLabels(id);
-                readyDrawSVG(id);
+                readyDrawSVG(id, previous_id);
             });
             readyDrawSVG("quickhull");
         });
-        const MIN_D_NODES = 5;//nodes
-        const MIN_Q_NODES = 20;//points
-        
-        const D_NODE_RADIUS = 20;
-        const Q_NODE_RADIUS = 5;
-        
-        const width = 720;
-        const height = 480;
 
-        function readyDrawSVG(id){
-            switch (id){
+
+        function clearLines() {
+            d3.selectAll("path").transition().attr("stroke", "white").on('end', () => {
+                d3.selectAll("path").remove();
+            });
+        }
+        function readyDrawSVG(id, previous_id) {
+            if (previous_id != null) {
+                console.log("previous_id => " + previous_id);
+                if (previous_id == "johnson_trotter") {
+                    d3.select('#permutation_result')
+                        .attr('class', 'animated fadeOutUp');
+                    d3.selectAll("svg").attr('class', 'animated fadeInUp');
+                }
+            }
+            switch (id) {
                 case "dijkstras":
                     //clear svg 
+                    //clear nodes
+                    //drawNodes([],0,0,"white",false);
+                    //clear lines
+
+                    clearLines();
                     //then call drawNodes with min default nodes
-                    drawNodes(getRandomPointSet(width,height,D_NODE_RADIUS,MIN_D_NODES)
-                    ,D_NODE_RADIUS
-                    ,"white");//requires points
+                    //we should use the same point set for that has been calculated
+                    //rather than generate a new one
+                    //generate a new one only if user requests a new one
+                    if (dijkstra_points == null) {
+                        dijkstra_points = getRandomPointSet(width, height, D_NODE_RADIUS, MIN_D_NODES);
+                    }
+                    drawNodes(dijkstra_points, D_NODE_RADIUS, 2 * D_NODE_RADIUS, "white", false);//requires points
                     break;
                 case "quickhull":
                     //clear svg
                     //call drawNodes with min default nodes
-                    drawNodes(getRandomPointSet(width,height,Q_NODE_RADIUS,MIN_Q_NODES)
-                    ,Q_NODE_RADIUS,//radius
-                    "white");//fill color
+                    clearLines();
+                    if (hull_points == null) {
+                        hull_points = getRandomPointSet(width, height, Q_NODE_RADIUS, MIN_Q_NODES)
+                    }
+                    drawNodes(hull_points, Q_NODE_RADIUS, 2 * Q_NODE_RADIUS, "white", false);//fill color
+                    break;
+                case "johnson_trotter":
+                    d3.selectAll("svg").attr('class', 'animated fadeOutDown');
                     break;
             }
         }
     </script>
-    <title>Algo Demo</title>
-  </head>
-  <body>
-      <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-            <a class="navbar-brand">
-                AlgoApp
-            </a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav mr-auto" >
-                    <li class="nav-item">
-                        <div class ="dropdown" >
-                            <button id="algoDropDown" class="rounded-0 btn btn-secondary dropdown-toggle" type="button" id="dropdownMenuButton" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                                Algorithms
-                            </button>
-                            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                                <a href="#" id="dijkstras" class="dropdown-item" >DIJKSTRAS</a>          
-                                <a href="#" id="quickhull" class="dropdown-item active" >QUICKHULL</a>
-                            </div>
-                        </div>
-                    </li>
-                </ul>
-            </div>
-        </nav>
+
+    <title>Algo App</title>
+</head>
+
+<body>
+    <!--Navbar-->
+    <nav class="navbar navbar-expand-lg navbar-dark primary-color">
+
+        <!-- Navbar brand -->
+        <a class="navbar-brand" href="#">Algo App</a>
+
+        <!-- Collapse button -->
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#basicExampleNav"
+            aria-controls="basicExampleNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- Collapsible content -->
+        <div class="collapse navbar-collapse" id="basicExampleNav">
+            <!-- Links -->
+            <ul class="navbar-nav mr-auto">
+                <!-- Dropdown -->
+                <li class="nav-item" id="dijkstras">
+                    <a href="#" class="nav-link">DIJKSTRAS</a>
+                </li>
+                <li class="nav-item active" id="quickhull">
+                    <a href="#" class="nav-link active">QUICKHULL</a>
+                </li>
+                <li class="nav-item" id="johnson_trotter">
+                    <a href="#" class="nav-link ">JOHNSON TROTTER</a>
+                </li>
+
+            </ul>
+            <!-- Links -->
+        </div>
+        <!-- Collapsible content -->
+
+    </nav>
+    <!--/.Navbar-->
 
     <div class="container-fluid h-100">
         <div class="row">
-            <div class="col-4">
+            <div class="col-lg-4 col-md-12">
                 <!--
                     describe algorithm
                 -->
+                <div class="row">
+                    <div class="col">
+                        <div class="carousel slide" data-ride="false" data-interval="false">
+                            <div class="carousel-inner">
+                                <div class="carousel-item">
+                                    <h1>
+                                        DIJKSTRAS
+                                    </h1>
+                                    <p>
+                                        Shortest Single Source Path
+                                    </p>
+                                    <p>
+                                        Find the shortest single source path in a weighted connected graph.
+                                        Result of algorithm is always an edge set that describes the shortest paths form
+                                        some
+                                        source.
+                                    </p>
+                                    <p>
+                                        <b>Solution:</b>
+                                    </p>
+                                    <p>
+                                        Starting at some source vertex v, select an edge that has the smallest path
+                                        length
+                                        from
+                                        source to v*.
+                                        Select the next edge that has minimum path length from the source to some vertex
+                                        not
+                                        connected in the edge set.
+                                        Repeat the process until the edge set contains connections to all vertices.
+                                    </p>
+                                </div>
+                                <div class="carousel-item active">
+                                    <h1>
+                                        QUICKHULL
+                                    </h1>
+                                    <p>
+                                        Convex Hull Problem
+                                    </p>
+                                    <p>
+                                        Find the convex hull of a set of points on the cartesian plane.
+                                    </p>
+                                    <p>
+                                        <b>Solution:</b>
+                                    </p>
+                                    <p>
+                                        Given a set of points S ={p1, p2,.., pn} on the cartesian plane. Sort the set by
+                                        increasing x coordinate, breaking ties using the larger y coordinate. The
+                                        leftmost
+                                        point, p1 and right most point pn of the set are part of the convex hull. The
+                                        divide
+                                        the
+                                        set using the line p1pn into two smaller sets, one left of the line and one
+                                        right of
+                                        the
+                                        line. The two sets are called the upper hull and the lower hull, the process
+                                        must be
+                                        repeated for each set, joining the sets will complete the convex hull.
+                                    </p>
+                                </div>
+                                <div class="carousel-item">
+                                    <h1>
+                                        JOHNSON TROTTER
+                                    </h1>
+                                    <p>
+                                        Permutation Generation Problem
+                                    </p>
+                                    <p>
+                                        Generate all permutations of some string s.
+                                    </p>
+                                    <p>
+                                        <b>Solution:</b>
+                                    </p>
+                                    <p>
+                                        Given some string s. Each character in the s is a mobile element that has a
+                                        value,
+                                        the
+                                        character, and
+                                        a direction,default is left. An element is mobile if it points at an element
+                                        smaller
+                                        than itself. Swap the largest mobile element
+                                        with the element that is in its direction. Every swap generates a permutation,
+                                        continue
+                                        this process until no mobile elements remain.
+                                    </p>
 
-                <div class="carousel slide" data-ride="false" data-interval="false">
-                    <div class="carousel-inner">
-                        <div class="carousel-item">
-                            <h1>
-                                DIJKSTRAS
-                            </h1>
-                            <p >
-                                Shortest Single Source Path
-                            </p>
-                            <p >
-                                Find the shortest single source path in a weighted connected graph.
-                                Result of algorithm is always an edge set that describes the shortest paths form some source.
-                            </p>
-                            <p>
-                                <b>Solution:</b>
-                            </p>
-                            <p>
-                                Starting at some source vertex v, select an edge that has the smallest path length from source to v*.
-                                Select the next edge that has minimum path length from the source to some vertex not connected in the edge set.
-                                Repeat the process until the edge set contains connections to all vertices.
-                            </p>
-                        </div>
-                        <div class="carousel-item active">
-                            <h1>
-                                QUICKHULL
-                            </h1>
-                            <p >
-                                Convex Hull Problem
-                            </p>
-                            <p >
-                                Find the convex hull of a set of points on the cartesian plane.
-                            </p>
-                            <p>
-                                <b>Solution:</b>
-                            </p>
-                            <p >
-                                Given a set of points S ={p1, p2,.., pn} on the cartesian plane. Sort the set by increasing x coordinate, breaking ties using the larger y coordinate. The leftmost point, p1 and right most point pn of the set are part of the convex hull. The divide the set using the line p1pn into two smaller sets, one left of the line and one right of the line. The two sets are called the upper hull and the lower hull, the process must be repeated for each set, joining the sets will complete the convex hull.
-                            </p>
+                                    <div class="row">
+                                        <div class="col-md-4 col-lg-8">
+                                            <div class="md-form">
+                                                <input maxLength="4" type="text" id="permutation_input"
+                                                    class="form-control">
+                                                <label for="permutation_input">Permutations For:</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-                
+                <div id="permutationContainer" class="row justify-content-center">
+                    <div class="data">
+
+                    </div>
+                    <div class="data">
+
+                    </div>
+                    <div class="data">
+
+                    </div>
+                    <div class="data">
+
+                    </div>
+                </div>
             </div>
-           
-            <div class="col-8" >
+
+            <div class="col-lg-8 col-md-12">
                 {% block content %}
                 {% endblock %}
             </div>
         </div>
     </div>
-    
-  </body>
+</body>
+
 </html>

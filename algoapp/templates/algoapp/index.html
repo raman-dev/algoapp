@@ -1,51 +1,82 @@
-
 {% extends "algoapp/base.html" %}
 
 {% block content %}
 <script>
     $(document).ready(() => {
-        $("#runFullAlgo").on("click",() => {
+        $("#runFullAlgo").on("click", () => {
             //need to access and store data of the current points
-            var data = d3.select("svg").selectAll("circle").data();
-            console.log(data);
-            quickhull(data,0,data.length - 1);
+            //check which is active
+            active_id = $("li.active").attr('id');
+            if (active_id == "dijkstras") {
+                var data = d3.select("svg").selectAll("circle").data();
+            } else if (active_id == "quickhull") {
+                if (!isAnimating) {
+                    clearLines();
+                    //don't reshuffle
+                    //state => 
+                    //old board
+                    //hit run=> rerun on old data
+                    var data = d3.selectAll("svg").selectAll("circle")
+                        .style('fill', 'white')
+                        .attr("stroke", 'black')
+                        .data();
+                    convex_hull(data);
+                }
+            } else if (active_id == "johnson_trotter") {
+                //grab default text and run
+                //perform ajax call send text to server
+                //and the print response
+                text = $("#permutation_input").val();
+                if (text.length > 0) {
+                    console.log("perm_in => " + text);
+                    $.ajax({
+                        url: '/permutations/' + text + '/',
+                        type: 'get',
+                        success: (data) => {
+                            console.log('success')
+                            console.log(data);
+                        },
+                        failure: (data) => {
+                            console.log('failure')
+                            console.log(data);
+                        }
+                    });
+                }
+                //reSort();
+                d3.select("#permutationContainer")
+                .selectAll(".data").transition("left",100);
+                console.log("Permutation!");
+            }
         });
     });
-    //draw a rectangle
-    //var height = 720;
-    //var width = 720;
-    //radius = 20;//
-    //n = 8
-    //points = getRandomPointSet(width,height,radius,n);//points have radius*2 width
-    //draw a random set of points on the canvas
-    //need to draw points
-    //draw a random set of points 
-    
-    //perform quickhull algorithm
-    
-    //features
-    //one click run through
-    //step by step runthrough
-    //restart to beginning
-    //refresh new set of points
-    
+
+    /*function reSort() {
+        d3.select("#permutationContainer")
+        .selectAll("div.data")
+        .sort(function (a, b) {
+            return d3.ascending(Math.random(), Math.random());
+        }).transition().duration(1000).style(
+                "left",function (d, i) {
+                    return 60 + ((i * 30)) + "px";
+                }
+            )
+    }*/
 </script>
+
 <div class="row">
-    <svg width = "720" height="480">
-        <path fill="none" stroke="black"></path>
-        <circle stroke="black" cx="0" cy="0" r="0"></circle>
+    <svg width="720" height="480">
     </svg>
 </div>
-<div class="row justify-content-center">
-    <div class="btn-group" role="group">
-        <button id="newNodeSet" class="btn bg-dark btn-secondary" type="button" >
-            New Set!
-        </button>
-        <button id="runFullAlgo" class="btn bg-dark btn-secondary" type="button">
-            Run
-        </button>
+<div class="row fixed-bottom justify-content-end">
+    <div class="col-lg-2 col-md-2">
+        <div class="btn-group" role="group">
+            <button id="runFullAlgo" class="btn btn-primary" type="button">
+                Run
+            </button>
+        </div>
     </div>
-    
+
 </div>
+
+
 {% endblock %}
-     
