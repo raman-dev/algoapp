@@ -31,11 +31,9 @@
 
 
     <script type="text/javascript">
-        const MIN_D_NODES = 5;//nodes
         const MIN_Q_NODES = 20;//points
         const DEFAULT_PERM = "abc";//default text for permutation
 
-        const D_NODE_RADIUS = 20;
         const Q_NODE_RADIUS = 5;
 
         const width = 720;
@@ -46,12 +44,9 @@
         const green = "green";
         const cyan = "#0bb";
 
-        var isAnimating = false;
-
-
         var scale = 2 * Q_NODE_RADIUS;
-        var dijkstra_points = null;
         var hull_points = null;
+        var quicksort = null;
 
 
         function Point(x, y) {
@@ -66,6 +61,7 @@
         class AnimationNode {
             id = null;
             points = null;
+
             constructor(id, points) {
                 this.points = points;
                 this.id = id;
@@ -80,18 +76,15 @@
                 //now what?
                 //now if points is size 2 do a transition from a to b
                 //if size is 3 then do a transition from points[0],points[2] to points[0],points[1],points[2]
-                isAnimating = true;
                 if (this.points.length == 2) {
                     var pmin = this.points[0];
                     var pmax = this.points[1];
                     highlightNode(pmin, cyan, blue).on('end', () => {
                         highlightNode(pmax, cyan, blue).on('end', () => {
-                            drawNewLine([[pmin.x * scale, pmin.y * scale]], this.id, scale, cyan);
+                            drawHullLine([[pmin.x * scale, pmin.y * scale]], this.id, scale, cyan);
                             transitionLine(this.id, [[pmin.x * scale, pmin.y * scale]], [[pmin.x * scale, pmin.y * scale], [pmax.x * scale, pmax.y * scale]]).on('end', () => {
                                 if (next_index < animNodes.length) {
                                     animNodes[next_index].renderLines(next_index + 1, animNodes);
-                                } else {
-                                    isAnimating = false;
                                 }
                             });
                         });
@@ -101,12 +94,10 @@
                 } else {
                     //we want to highlight the middle point
                     highlightNode(this.points[1], cyan, blue).on('end', () => {
-                        drawNewLine(this.local_d1, this.id, scale, cyan);
+                        drawHullLine(this.local_d1, this.id, scale, cyan);
                         transitionLine(this.id, this.local_d1, this.local_d2).on('end', () => {
                             if (next_index < animNodes.length) {
                                 animNodes[next_index].renderLines(next_index + 1, animNodes);
-                            } else {
-                                isAnimating = false;
                             }
                         });
                     });
@@ -142,8 +133,6 @@
             //randomly select rows and cols
             //select n pairs from rows and cols
 
-            console.log(rows);
-            console.log(cols);
             var r_index = [];
             var c_index = [];
             for (i = 1; i < rows - 1; i++) {
@@ -155,26 +144,11 @@
             //n rows and n cols
             shuffle(r_index);
             shuffle(c_index);
-            //console.log(r_index);
-            //console.log(c_index);
-            //
             let points = [];
             for (i = 0; i < n; i++) {
                 points.push(new Point(c_index[i], r_index[i]));
             }
             return points;
-        }
-
-        function drawLines(points, scale) {
-            var svg = d3.select("svg");
-            let parray = [];
-            for (i = 0; i < points.length; i++) {
-                let a = [points[i].x * (2 * scale), points[i].y * (2 * scale)];
-                parray.push(a);
-            }
-            var lines = svg.selectAll("path");
-            lgen = d3.line();
-            lines.attr("d", lgen(parray));
         }
 
         function drawNodes(points, radius, node_scale, fill_color, label_flag) {
@@ -244,28 +218,6 @@
                     .attr("fill", "black");
             }
         }
-
-        function drawLine(data_old, data_new, scale, stroke_color) {
-            var svg = d3.select("svg");
-            var line = d3.line();
-            var c_in = [];
-            svg.select("path").attr("stroke", stroke_color);
-            if (data_old.length > 0) {
-                data_old.forEach(p => {
-                    c_in.push([p.x * scale, p.y * scale]);
-                });
-            }
-
-            var c_out = [];
-            data_new.forEach(p => {
-                c_out.push([p.x * scale, p.y * scale]);
-            });
-            svg.select("path")
-                .attr('d', line(c_in))
-                .transition().delay(500)
-                .attr('d', line(c_out));
-        }
-
 
         function convex_hull(data) {
             data.sort((a, b) => {
@@ -399,7 +351,7 @@
             return t.duration(500).attrTween('d', function () { return d3.interpolatePath(line(d1), line(d2)); });
         }
 
-        function drawNewLine(points, id, scale, stroke_color) {
+        function drawHullLine(points, id, scale, stroke_color) {
             var svg = d3.select("svg");
             var path = svg.append("path");
             var data = points;
@@ -408,6 +360,7 @@
             path.attr('d', line(data));
             path.attr('fill', "none");
             path.attr('id', id);
+            path.attr('class', 'hull_line');
             path.attr('stroke', stroke_color);
             return path;
         }
@@ -424,27 +377,30 @@
                 .style("fill", fill_color);
         }
 
-        function updateLabels(algo_id) {
+        function updateCarousel(algo_id) {
             switch (id) {
-                case "dijkstras":
-                    $(".carousel").carousel(0);
-
-                    break;
                 case "quickhull":
-                    $(".carousel").carousel(1);
-
+                    $(".carousel").carousel(0);
                     break;
                 case "johnson_trotter":
+                    $(".carousel").carousel(1);
+                    break;
+                case "quicksort":
                     $(".carousel").carousel(2);
                     break;
             }
         }
         $(document).ready(function () {
+            $('#permutation_input').on('input', () => {
+                updateSVGText($('#permutation_input').val());
+            });
             $(".nav-item").on('click', function (e) {
                 id = $(this).attr('id');
-                console.log(id);
                 //$("a.active").removeClass("active");
                 previous_id = $('li.active').attr('id');
+                if (id == previous_id) {
+                    return;
+                }
                 $("li.active").removeClass("active");
                 $("#" + id).addClass("active");
 
@@ -452,58 +408,424 @@
                 //or what
                 //clear canvas
                 //change the title
-                updateLabels(id);
+                updateCarousel(id);
                 readyDrawSVG(id, previous_id);
             });
             readyDrawSVG("quickhull");
         });
 
 
-        function clearLines() {
-            d3.selectAll("path").transition().attr("stroke", "white").on('end', () => {
-                d3.selectAll("path").remove();
+        function clearHullLines() {
+            d3.selectAll(".hull_line").transition().attr("stroke", "white").on('end', () => {
+                d3.selectAll(".hull_line").remove();
             });
         }
+        var permString = null;
         function readyDrawSVG(id, previous_id) {
-            if (previous_id != null) {
-                console.log("previous_id => " + previous_id);
-                if (previous_id == "johnson_trotter") {
-                    d3.select('#permutation_result')
-                        .attr('class', 'animated fadeOutUp');
-                    d3.selectAll("svg").attr('class', 'animated fadeInUp');
-                }
+            if (previous_id == 'johnson_trotter') {
+                permString.fadeOut();
+            } else if (previous_id == 'quicksort') {
+                quicksort.fadeOut();
             }
             switch (id) {
-                case "dijkstras":
-                    //clear svg 
-                    //clear nodes
-                    //drawNodes([],0,0,"white",false);
-                    //clear lines
-
-                    clearLines();
-                    //then call drawNodes with min default nodes
-                    //we should use the same point set for that has been calculated
-                    //rather than generate a new one
-                    //generate a new one only if user requests a new one
-                    if (dijkstra_points == null) {
-                        dijkstra_points = getRandomPointSet(width, height, D_NODE_RADIUS, MIN_D_NODES);
-                    }
-                    drawNodes(dijkstra_points, D_NODE_RADIUS, 2 * D_NODE_RADIUS, "white", false);//requires points
-                    break;
                 case "quickhull":
                     //clear svg
                     //call drawNodes with min default nodes
-                    clearLines();
+                    clearHullLines();
                     if (hull_points == null) {
                         hull_points = getRandomPointSet(width, height, Q_NODE_RADIUS, MIN_Q_NODES)
                     }
                     drawNodes(hull_points, Q_NODE_RADIUS, 2 * Q_NODE_RADIUS, "white", false);//fill color
                     break;
                 case "johnson_trotter":
-                    d3.selectAll("svg").attr('class', 'animated fadeOutDown');
+                    //do what 
+                    clearCircles();
+                    clearHullLines();
+                    //now what?
+                    //now nothing
+                    if (permString == null) {
+                        permString = new PermutationString(width, height);
+                    }
+                    permString.fadeIn();
+                    //show arrows above all text
+                    //initially all text has left arrows
+                    //we will flip arrows     
+                    break;
+                case "quicksort":
+                    clearCircles();
+                    clearHullLines();
+                    if (quicksort == null) {
+                        quicksort = new QuickSort(width, height);
+                    }
+                    quicksort.shuffle();
+                    quicksort.fadeIn();
                     break;
             }
         }
+
+        class QuickSort {
+            array = [0, 1, 2, 3, 4, 5, 6, 7, 8];
+            initial_x = null;
+            center_y = null;
+
+            left_iter = null;
+            right_iter = null;
+            pivot = null;
+
+            duration = 500;
+
+            shuffle() {
+                shuffle(this.array);
+                console.log(this.array);
+            }
+
+            getArrayString() {
+                var result = '';
+                for (i = 0; i < this.array.length; i++) {
+                    result += this.array[i];
+                }
+                return result;
+            }
+
+            constructor(width, height) {
+                //shuffle(this.array);
+                //add the qs_text elements
+                var text = d3.select('svg').selectAll('.qs_text')
+                    .data(this.array)
+                    .enter()
+                    .append('text');
+
+                this.initial_x = width / 2 - (this.array.length / 2) * 30;
+                this.center_y = height / 2 - 18;
+                text.attr('x', (d, i) => {
+                    return this.initial_x + i * 30;
+                })
+                    .attr('y', this.center_y + '')
+                    .attr('class', 'qs_text')
+                    .attr('font-family', 'sans-serif')
+                    .attr('font-size', '32px')
+                    .attr('fill', 'black')
+                    .attr('id', (d, i) => {
+                        return 'qs' + i;
+                    });
+                d3.select('svg')
+                    .selectAll('.qs_iters')
+                    .attr('x', this.initial_x + '')
+                    .attr('y', (this.center_y - 36) + '')
+                    .attr('font-family', 'sans-serif')
+                    .attr('font-size', '0px')
+                    .attr('fill', 'white');
+                var svg = d3.select('svg');
+                svg.select('#qs_pivot').attr('y', (this.center_y + 36) + '');
+                svg.select('#qs_lbar').attr('y', (this.center_y + 36) + '');
+                svg.select('#qs_rbar').attr('y', (this.center_y + 36) + '');
+
+            }
+
+            sort(action_list, index) {
+                //just call transition and change positions
+                //for each action
+                //keep grabbing actions
+                var obj = action_list[index];
+                var key = Object.keys(action_list[index])[0];
+                console.log(key);
+                switch (key) {
+                    case 'SWAP':
+                        //if we swap action
+                        //we swap the values at
+                        //this is a swap between the pivot index and the value at left or right iter
+                        console.log(obj);
+                        var index_a = obj['SWAP'][0];
+                        var index_b = obj['SWAP'][1];
+
+                        var t = this.array[index_a];
+                        this.array[index_a] = this.array[index_b];
+                        this.array[index_b] = t;
+                        //so swap the order in array
+                        console.log(index_a);
+                        console.log(index_b);
+                        //now swap the elements at index_a and index_b
+                        d3.select('svg').select('#qs' + index_a).transition().duration(this.duration)
+                            .attr('x', '' + (this.initial_x + index_b * 30));
+                        d3.select('svg').select('#qs' + index_b).transition().duration(this.duration)
+                            .attr('x', '' + (this.initial_x + index_a * 30))
+                            .on('end', () => {
+                                //swap the two id's
+                                d3.select('svg').select('#qs' + index_b).attr('id', 'qstemp');
+                                d3.select('svg').select('#qs' + index_a).attr('id', 'qs' + index_b);
+                                d3.select('svg').select('#qstemp').attr('id', 'qs' + index_a);
+                                if (index != action_list.length - 1) {
+                                    this.sort(action_list, index + 1);
+                                }
+                            });
+                        break;
+                    case 'LI_MOVE':
+                        //
+                        this.left_iter = obj['LI_MOVE'];
+                        d3.select('svg').selectAll('#qs_liter').transition().duration(this.duration)
+                            .attr('x', '' + (this.initial_x + this.left_iter * 30))
+                            .on('end', () => {
+                                if (index != action_list.length - 1) {
+                                    this.sort(action_list, index + 1);
+                                }
+                            });
+                        break;
+                    case 'RI_MOVE':
+                        this.right_iter = obj['RI_MOVE'];
+                        d3.select('svg').selectAll('#qs_riter').transition().duration(this.duration)
+                            .attr('x', '' + (this.initial_x + this.right_iter * 30))
+                            .on('end', () => {
+                                if (index != action_list.length - 1) {
+                                    this.sort(action_list, index + 1);
+                                }
+                            });
+                        break;
+                    case 'P_MOVE':
+                        this.pivot = obj['P_MOVE'];
+                        d3.select('svg').selectAll('#qs_pivot').transition().duration(this.duration)
+                            .attr('x', '' + (this.initial_x + this.pivot * 30))
+                            .on('end', () => {
+                                if (index != action_list.length - 1) {
+                                    this.sort(action_list, index + 1);
+                                }
+                            });
+                        break;
+                    case 'NEW_PARTITION':
+                        //put 2 partition bars showing the new parition
+                        var lbar_index = obj['NEW_PARTITION'][0];
+                        var rbar_index = obj['NEW_PARTITION'][1];
+
+                        d3.select('svg').selectAll('#qs_lbar').transition().duration(this.duration)
+                            .attr('x', '' + ((this.initial_x + lbar_index * 30) - 9));
+                        d3.select('svg').selectAll('#qs_rbar').transition().duration(this.duration)
+                            .attr('x', '' + (18 + this.initial_x + rbar_index * 30))
+                            .on('end', () => {
+                                if (index != action_list.length - 1) {
+                                    this.sort(action_list, index + 1);
+                                }
+                            });
+                        break;
+                }
+            }
+
+            fadeIn() {
+                for (i = 0; i < this.array.length; i++) {
+                    d3.select('svg').select('#qs' + i).attr('x', '' + (this.initial_x + i * 30))
+                        .text('' + this.array[i]);
+                }
+                d3.select('svg').selectAll('.qs_text')
+                    .transition()
+                    .attr('fill', 'black')
+                    .attr('font-size', '32px');
+                d3.select('svg').selectAll('.qs_iters')
+                    .transition().attr('fill', 'black').attr('font-size', '32px');
+            }
+
+            fadeOut() {
+                var svg = d3.select('svg').selectAll('.qs_text');
+                svg.transition()
+                    .attr('fill', 'white')
+                    .attr('font-size', '0px');
+                d3.select('svg').selectAll('.qs_iters')
+                    .transition().attr('fill', 'white').attr('font-size', '0px');
+
+            }
+        }
+        //what object can i create?
+        //so each letter has a direction so when we call draw()
+        //the letter should appear
+        class PermutationString {
+
+            num_letters = 4;//minimum letters in a string
+            font_size = 32;
+            char_space = 0;//width of a single text element
+            center_x = 0;
+            center_y = 0;
+
+            data = [];
+            y_position = null;
+            initial_x = null;
+            chevron_ypos = null;
+            duration = 500;
+
+            directionTransitionMap = null;
+
+            isAnimating = false;
+            constructor(width, height) {
+                this.center_x = width / 2;
+                this.y_position = height / 2;
+                this.directionTransitionMap = new Map();
+                //create minimum 4 text elements in svg
+                //this. data = d3.range(0,this.num_letters);
+                for (i = 0; i < this.num_letters; i++) {
+                    this.data.push("" + i);
+                }
+
+                var svg = d3.selectAll("svg");
+                var text = svg.selectAll(".perm_text")
+                    .data(this.data)
+                    .enter()
+                    .append("text");
+
+                this.initial_x = this.center_x - 2 * (30);//how many characters are there? 4
+                this.chevron_ypos = this.y_position - 60;
+                text.attr("x", (d, i) => {
+                    return '' + (this.initial_x + i * 30);
+                })//center in x direction
+                    .attr("y", (d) => { return this.y_position; })//center in y direction
+                    .attr("id", (d) => { return "t" + d.toString(); })
+                    .text((d, i) => { return i + ""; }) //default text is index of each element
+                    .attr("font-family", "sans-serif")
+                    .attr('class', 'perm_text')
+                    .attr("font-size", this.font_size + "px")
+                    .attr("fill", "black");
+                //position the 
+                d3.select('svg')
+                    .selectAll('g')
+                    .attr('transform', (d, i) => {
+                        return 'translate(' + (this.initial_x + i * 30) + ' ' + (this.chevron_ypos) + ') scale(1 1) ';
+                    });
+                d3.select('svg').selectAll('#right_arrow').attr('fill', 'none');
+            }
+
+            //used to change text values at each position
+            //if a string less than the length of the text elements is entered
+            //text elements outside the length of the text will be blank
+            updateText(text) {
+                //change data to the text input
+                //when write the ith char to the ith text element
+                //lets update text elements
+                //need to cancel any animations so call transition
+                d3.select('svg').selectAll('.perm_text').transition();
+                d3.select('svg').selectAll('.arrow').attr('fill', 'none');
+                var svg = d3.select('svg');
+                //max 4 letters
+                for (i = 0; i < this.num_letters; i++) {
+                    if (i >= text.length) {
+                        svg.select('#lc' + i).select('#left_arrow').attr('fill', 'none');
+                    } else {
+                        svg.select('#lc' + i).select('#left_arrow').attr('fill', 'black');
+                    }
+                    svg.select('#t' + i).text(text.charAt(i));
+                }
+            }
+
+            //we need to get this to disappear as we move away
+            fadeOut() {
+                //restore positions
+                //
+                d3.select("svg")
+                    .selectAll(".perm_text")
+                    .transition()
+                    .duration(300)
+                    .attr('font-size', '0px')
+                    .attr('fill', 'white');
+                //fade out direction arrows if they are visible
+                d3.select("svg").selectAll(".arrow")
+                    .transition().duration(300)
+                    .attr('fill', 'none');
+            }
+
+            fadeIn() {
+                var svg = d3.select('svg');
+                svg.selectAll(".perm_text")
+                    .transition()
+                    .duration(300)
+                    .attr('font-size', '32px')
+                    .attr('fill','black');
+                svg.selectAll("#left_arrow")
+                    .transition().duration(300)
+                    .attr('fill', 'black');
+                
+            }
+
+            permute(action_list, index) {
+                //take from array 2 at a time
+                //i don't know what to do ?
+                //console.log(array);
+                //change the order of the data array then update the data
+                //reset arrow positions
+                //reset arrows
+                //
+                var obj = action_list[index];
+                var key = Object.keys(obj)[0];
+                console.log(obj);
+                if (key == 'SWAP') {
+                    //swap two elements
+                    //swap 2 elements
+                    console.log('swap');
+                    //swap letters at position
+                    var id_a = obj['SWAP'][0];
+                    var id_b = obj['SWAP'][1];
+                    var svg = d3.select('svg');
+
+                    svg.select('#lc' + id_a).transition().delay(this.duration)
+                        .attr('transform', 'translate(' + (this.initial_x + id_b * 30) + ',' + (this.chevron_ypos) + ') scale(1 1)');
+                    svg.select('#lc' + id_b).transition().delay(this.duration)
+                        .attr('transform', 'translate(' + (this.initial_x + id_a * 30) + ',' + (this.chevron_ypos) + ') scale(1 1)')
+                        .on('end', () => {
+                            svg.select('#lc' + id_b).attr('id', 'lc_temp');
+                            svg.select('#lc' + id_a).attr('id', 'lc' + id_b);
+                            svg.select('#lc_temp').attr('id', 'lc' + id_a);
+                        });
+
+                    svg.select('#t' + id_a).transition().delay(this.duration)
+                        .attr('x', '' + (this.initial_x + id_b * 30));
+                    svg.select('#t' + id_b).transition().delay(this.duration)
+                        .attr('x', '' + (this.initial_x + id_a * 30)).on('end', () => {
+                            svg.select('#t' + id_b).attr('id', 'jt_temp');
+                            svg.select('#t' + id_a).attr('id', 't' + id_b);
+                            svg.select('#jt_temp').attr('id', 't' + id_a);
+                            if (index != action_list.length - 1) {
+                                this.permute(action_list, index + 1);
+                            }
+                        });
+                } else {
+                    //flip direction
+                    //flip the direction
+                    console.log('flip');
+                    var id = '#lc' + obj['NEW_DIRECTION'][0];
+                    var new_direction = obj['NEW_DIRECTION'][1];
+                    var svg = d3.select('svg');
+                    if (new_direction == 1) {
+                        //
+                        svg.select(id).select('#left_arrow').transition().duration(this.duration)
+                            .attr('fill', 'none');
+                        svg.select(id).select('#right_arrow').transition().duration(this.duration)
+                            .attr('fill', 'black').on('end', () => {
+                                if (index != action_list.length - 1) {
+                                    this.permute(action_list, index + 1);
+                                }
+                            });
+
+                    } else {
+                        svg.select(id).select('#right_arrow').transition().duration(this.duration)
+                            .attr('fill', 'none');
+                        svg.select(id).select('#left_arrow').transition().duration(this.duration)
+                            .attr('fill', 'black').on('end', () => {
+                                if (index != action_list.length - 1) {
+                                    this.permute(action_list, index + 1);
+                                }
+                            });
+                    }
+
+                }
+
+            }
+
+        }
+
+        function clearCircles() {
+            d3.selectAll("circle")
+                .transition().duration(300)
+                .attr('r', 0)
+                .remove();
+        }
+
+        function updateSVGText(text) {
+            //modify the data in the svg
+            permString.updateText(text);
+        } 
     </script>
 
     <title>Algo App</title>
@@ -527,16 +849,15 @@
             <!-- Links -->
             <ul class="navbar-nav mr-auto">
                 <!-- Dropdown -->
-                <li class="nav-item" id="dijkstras">
-                    <a href="#" class="nav-link">DIJKSTRAS</a>
-                </li>
                 <li class="nav-item active" id="quickhull">
                     <a href="#" class="nav-link active">QUICKHULL</a>
                 </li>
                 <li class="nav-item" id="johnson_trotter">
                     <a href="#" class="nav-link ">JOHNSON TROTTER</a>
                 </li>
-
+                <li class="nav-item" id="quicksort">
+                    <a href="#" class="nav-link">QUICKSORT</a>
+                </li>
             </ul>
             <!-- Links -->
         </div>
@@ -555,33 +876,6 @@
                     <div class="col">
                         <div class="carousel slide" data-ride="false" data-interval="false">
                             <div class="carousel-inner">
-                                <div class="carousel-item">
-                                    <h1>
-                                        DIJKSTRAS
-                                    </h1>
-                                    <p>
-                                        Shortest Single Source Path
-                                    </p>
-                                    <p>
-                                        Find the shortest single source path in a weighted connected graph.
-                                        Result of algorithm is always an edge set that describes the shortest paths form
-                                        some
-                                        source.
-                                    </p>
-                                    <p>
-                                        <b>Solution:</b>
-                                    </p>
-                                    <p>
-                                        Starting at some source vertex v, select an edge that has the smallest path
-                                        length
-                                        from
-                                        source to v*.
-                                        Select the next edge that has minimum path length from the source to some vertex
-                                        not
-                                        connected in the edge set.
-                                        Repeat the process until the edge set contains connections to all vertices.
-                                    </p>
-                                </div>
                                 <div class="carousel-item active">
                                     <h1>
                                         QUICKHULL
@@ -640,28 +934,50 @@
                                         <div class="col-md-4 col-lg-8">
                                             <div class="md-form">
                                                 <input maxLength="4" type="text" id="permutation_input"
-                                                    class="form-control">
+                                                    class="form-control" pattern="([A-Za-z0-9])+">
                                                 <label for="permutation_input">Permutations For:</label>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+                                <div class="carousel-item">
+                                    <h1>
+                                        QUICKSORT
+                                    </h1>
+                                    <p>
+                                        Sorting an array of integers.
+                                    </p>
+                                    <p>
+                                        Sort an array of integers in increasing order.
+                                    </p>
+                                    <p>
+                                        <b>Solution:</b>
+                                    </p>
+                                    <p>
+                                        Select a the element in the middle as the pivot. Use two iterators a left
+                                        and
+                                        right iterator.
+                                        Left iterator starts at the beginning of the partition and the right iterator
+                                        starts at the end of the partition.
+                                        The left iterator will move over elements less than or equal to the pivot,
+                                        when
+                                        an element greater than the pivot is found
+                                        swap the value at the left iterator and the pivot; right iterator moves
+                                        over
+                                        values greater than or equal to the pivot, when a value less than
+                                        pivot is found
+                                        swap with the pivot. This process continues until left and right iterators
+                                        meet
+                                        or run off the end. The pivot will now be in the correct location, and we
+                                        must
+                                        repeat
+                                        this process for smaller paritions consisting of values left of the pivot
+                                        and
+                                        then values right of the pivot.
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-                <div id="permutationContainer" class="row justify-content-center">
-                    <div class="data">
-
-                    </div>
-                    <div class="data">
-
-                    </div>
-                    <div class="data">
-
-                    </div>
-                    <div class="data">
-
                     </div>
                 </div>
             </div>

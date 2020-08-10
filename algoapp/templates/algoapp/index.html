@@ -2,70 +2,143 @@
 
 {% block content %}
 <script>
+    var right = true;
     $(document).ready(() => {
         $("#runFullAlgo").on("click", () => {
             //need to access and store data of the current points
             //check which is active
             active_id = $("li.active").attr('id');
-            if (active_id == "dijkstras") {
-                var data = d3.select("svg").selectAll("circle").data();
-            } else if (active_id == "quickhull") {
-                if (!isAnimating) {
-                    clearLines();
-                    //don't reshuffle
-                    //state => 
-                    //old board
-                    //hit run=> rerun on old data
-                    var data = d3.selectAll("svg").selectAll("circle")
-                        .style('fill', 'white')
-                        .attr("stroke", 'black')
-                        .data();
-                    convex_hull(data);
-                }
+
+            if (active_id == "quickhull") {
+                clearHullLines();
+                //don't reshuffle
+                //state => 
+                //old board
+                //hit run=> rerun on old data
+                var data = d3.selectAll("svg").selectAll("circle")
+                    .style('fill', 'white')
+                    .attr("stroke", 'black')
+                    .data();
+                convex_hull(data);
+
             } else if (active_id == "johnson_trotter") {
                 //grab default text and run
                 //perform ajax call send text to server
                 //and the print response
+                //test rotation
+
                 text = $("#permutation_input").val();
                 if (text.length > 0) {
                     console.log("perm_in => " + text);
+                    //make sure text is unique
+                    var set = new Set();
+                    for (i = 0; i < text.length; i++) {
+                        if (set.has(text.charAt(i))) {
+                            //string without unique characters
+                            //signal to user incorrect input
+                            return;
+                        }
+                        set.add(text.charAt(i));
+                    }
+
                     $.ajax({
                         url: '/permutations/' + text + '/',
                         type: 'get',
                         success: (data) => {
-                            console.log('success')
-                            console.log(data);
+                            console.log('success');
+                            //console.log(data['permutations']);
+                            //now for every 2 schedule a transition
+                            //convert to array of ints
+                            //remove brackets
+                            ///split into actions?
+                            var obj = JSON.parse(data['permutations']);
+                            permString.permute(obj, 0);//swapIntArray);
+                            //for each 
                         },
                         failure: (data) => {
-                            console.log('failure')
+                            console.log('failure');
                             console.log(data);
                         }
                     });
                 }
                 //reSort();
-                d3.select("#permutationContainer")
-                .selectAll(".data").transition("left",100);
+                //for each div.data grab the position
+                //grab each position and save it
+                //find
                 console.log("Permutation!");
+            } else if (active_id == "quicksort") {
+                var input = quicksort.getArrayString();
+                $.ajax({
+                    url: '/quicksort/' + input + '/',
+                    type: 'get',
+                    success: (data) => {
+                        action_list = data['qs_result'];
+                        var obj = JSON.parse(action_list);
+                        console.log(obj);
+                        quicksort.sort(obj, 0);
+                    },
+                    failure: (data) => {
+                        console.log('failure');
+                        console.log(data);
+                    }
+                });
             }
         });
     });
-
-    /*function reSort() {
-        d3.select("#permutationContainer")
-        .selectAll("div.data")
-        .sort(function (a, b) {
-            return d3.ascending(Math.random(), Math.random());
-        }).transition().duration(1000).style(
-                "left",function (d, i) {
-                    return 60 + ((i * 30)) + "px";
-                }
-            )
-    }*/
 </script>
 
-<div class="row">
+<div class="row justify-content-center">
+
     <svg width="720" height="480">
+
+        <g id="lc0" class="jt_direction">
+            <!--path d="M0 0h24v24H0V0z" fill="none" /-->
+            <path fill="none" class="arrow" id="right_arrow"
+                d="M6.49 20.13l1.77 1.77 9.9-9.9-9.9-9.9-1.77 1.77L14.62 12l-8.13 8.13z" />
+            <path fill="none" class="arrow" id="left_arrow"
+                d="M17.51 3.87L15.73 2.1 5.84 12l9.9 9.9 1.77-1.77L9.38 12l8.13-8.13z" />
+        </g>
+
+        <g id="lc1" class="jt_direction">
+            <path fill="none" class="arrow" id="right_arrow"
+                d="M6.49 20.13l1.77 1.77 9.9-9.9-9.9-9.9-1.77 1.77L14.62 12l-8.13 8.13z" />
+            <path fill="none" class="arrow" id="left_arrow"
+                d="M17.51 3.87L15.73 2.1 5.84 12l9.9 9.9 1.77-1.77L9.38 12l8.13-8.13z" />
+        </g>
+
+        <g id="lc2" class="jt_direction">
+            <path fill="none" class="arrow" id="right_arrow"
+                d="M6.49 20.13l1.77 1.77 9.9-9.9-9.9-9.9-1.77 1.77L14.62 12l-8.13 8.13z" />
+            <path fill="none" class="arrow" id="left_arrow"
+                d="M17.51 3.87L15.73 2.1 5.84 12l9.9 9.9 1.77-1.77L9.38 12l8.13-8.13z" />
+        </g>
+
+        <g id="lc3" class="jt_direction">
+            <path fill="none" class="arrow" id="right_arrow"
+                d="M6.49 20.13l1.77 1.77 9.9-9.9-9.9-9.9-1.77 1.77L14.62 12l-8.13 8.13z" />
+            <path fill="none" class="arrow" id="left_arrow"
+                d="M17.51 3.87L15.73 2.1 5.84 12l9.9 9.9 1.77-1.77L9.38 12l8.13-8.13z" />
+        </g>
+
+
+        <text class="qs_iters" id="qs_liter">
+            L
+        </text>
+        <text class="qs_iters" id="qs_pivot">
+            P
+        </text>
+        <text class="qs_iters" id="qs_riter">
+            R
+        </text>
+        <text class="qs_iters" id="qs_lbar">
+            |
+        </text>
+        <text class="qs_iters" id="qs_rbar">
+            |
+        </text>
+
     </svg>
+
 </div>
 <div class="row fixed-bottom justify-content-end">
     <div class="col-lg-2 col-md-2">
@@ -75,7 +148,6 @@
             </button>
         </div>
     </div>
-
 </div>
 
 
